@@ -1,0 +1,11 @@
+sku_id,category,lead_time_days,init_stock,unit_cost,holding_cost_per_unit_per_year,ordering_cost
+SKU_01,Supplements,4,575,27.55,15.91,500
+SKU_02,Makeup,9,309,473.15,47.5,500
+SKU_03,Supplements,14,909,323.21,29.69,500
+SKU_04,Haircare,12,626,474.27,43.49,500
+SKU_05,Supplements,4,295,45.66,16.8,500
+SKU_06,Makeup,11,727,345.56,44.45,500
+SKU_07,Skincare,6,330,415.82,49.37,500
+SKU_08,Haircare,7,441,259.67,35.69,500
+SKU_09,Makeup,6,558,227.22,4.99,500
+SKU_10,Haircare,10,825,191.53,35.4,500
