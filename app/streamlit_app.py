@@ -87,46 +87,41 @@ st.dataframe(to_reorder)
 
 
 if len(selected_skus) > 0:
-    st.subheader(f"Forecast for selected SKU")
-    sku0 = selected_skus[0]
-    df_sku0 = sales[sales['sku_id']==sku0].sort_values('date')
-    # Prophet forecast
-    prophet_model = load_prophet_model(sku0)
-    prophet_vals = None
-    if prophet_model is not None:
-        prophet_df = forecast_with_prophet(prophet_model, df_sku0[['date','units_sold']].rename(columns={'date':'ds','units_sold':'y'}), periods=horizon)
-        prophet_vals = prophet_df['yhat'].values
-    # XGBoost forecast
-    xgb_model = load_xgb_model(sku0)
-    xgb_vals = None
-    if xgb_model is not None:
-        # Feature engineering for XGBoost (same as in training)
-        df_xgb = df_sku0.copy()
-        df_xgb['lag_1'] = df_xgb['units_sold'].shift(1)
-        df_xgb['lag_7'] = df_xgb['units_sold'].shift(7)
-        df_xgb['lag_14'] = df_xgb['units_sold'].shift(14)
-        df_xgb['lag_28'] = df_xgb['units_sold'].shift(28)
-        df_xgb['rolling_mean_7'] = df_xgb['units_sold'].rolling(7).mean().shift(1)
-        df_xgb['rolling_std_14'] = df_xgb['units_sold'].rolling(14).std().shift(1)
-        df_xgb['day_of_week'] = df_xgb['date'].dt.weekday
-        df_xgb['is_weekend'] = df_xgb['day_of_week'].isin([5,6]).astype(int)
-        df_xgb = df_xgb.dropna().reset_index(drop=True)
-        features = ['lag_1','lag_7','lag_14','lag_28','rolling_mean_7','rolling_std_14','day_of_week','is_weekend','on_promo','price','views']
-        xgb_vals = forecast_with_xgb(xgb_model, df_xgb, features, periods=horizon)
-    # Prepare DataFrame for plotting
-    actual = df_sku0.set_index('date')['units_sold']
-    last_actual_date = df_sku0['date'].max()
-    future_idx = pd.date_range(last_actual_date + pd.Timedelta(days=1), periods=horizon, freq='D')
-    plot_df = pd.DataFrame({"actual": actual})
-    if prophet_vals is not None:
-        plot_df["Prophet forecast"] = pd.Series(prophet_vals, index=future_idx)
-    if xgb_vals is not None:
-        plot_df["XGBoost forecast"] = pd.Series(xgb_vals, index=future_idx)
-    st.line_chart(plot_df)
-    if prophet_vals is None:
-        st.warning(f"No Prophet model found for {sku0}.")
-    if xgb_vals is None:
-        st.warning(f"No XGBoost model found for {sku0}.")
+    st.subheader("Forecast for selected SKUs")
+    import plotly.graph_objects as go
+    fig = go.Figure()
+    for sku in selected_skus:
+        df_sku = sales[sales['sku_id']==sku].sort_values('date')
+        last_actual_date = df_sku['date'].max()
+        future_idx = pd.date_range(last_actual_date + pd.Timedelta(days=1), periods=horizon, freq='D')
+        # Prophet forecast
+        prophet_model = load_prophet_model(sku)
+        if prophet_model is not None:
+            prophet_df = forecast_with_prophet(prophet_model, df_sku[['date','units_sold']].rename(columns={'date':'ds','units_sold':'y'}), periods=horizon)
+            prophet_vals = prophet_df['yhat'].values
+            fig.add_trace(go.Scatter(x=future_idx, y=prophet_vals, mode='lines+markers', name=f'{sku} Prophet'))
+        else:
+            st.warning(f"No Prophet model found for {sku}.")
+        # XGBoost forecast
+        xgb_model = load_xgb_model(sku)
+        if xgb_model is not None:
+            df_xgb = df_sku.copy()
+            df_xgb['lag_1'] = df_xgb['units_sold'].shift(1)
+            df_xgb['lag_7'] = df_xgb['units_sold'].shift(7)
+            df_xgb['lag_14'] = df_xgb['units_sold'].shift(14)
+            df_xgb['lag_28'] = df_xgb['units_sold'].shift(28)
+            df_xgb['rolling_mean_7'] = df_xgb['units_sold'].rolling(7).mean().shift(1)
+            df_xgb['rolling_std_14'] = df_xgb['units_sold'].rolling(14).std().shift(1)
+            df_xgb['day_of_week'] = df_xgb['date'].dt.weekday
+            df_xgb['is_weekend'] = df_xgb['day_of_week'].isin([5,6]).astype(int)
+            df_xgb = df_xgb.dropna().reset_index(drop=True)
+            features = ['lag_1','lag_7','lag_14','lag_28','rolling_mean_7','rolling_std_14','day_of_week','is_weekend','on_promo','price','views']
+            xgb_vals = forecast_with_xgb(xgb_model, df_xgb, features, periods=horizon)
+            fig.add_trace(go.Scatter(x=future_idx, y=xgb_vals, mode='lines+markers', name=f'{sku} XGBoost'))
+        else:
+            st.warning(f"No XGBoost model found for {sku}.")
+    fig.update_layout(title="Forecast for selected SKUs", xaxis_title="Date", yaxis_title="Forecasted Units Sold")
+    st.plotly_chart(fig, use_container_width=True)
     # Explanation text
     st.markdown("""
     **Formulae used:**
